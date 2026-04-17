@@ -1,0 +1,222 @@
+<div class="py-4">
+  <h4 class="text-center mb-3">Diminishing Returns Simulation</h4>
+
+  <div class="card p-3 p-md-4 shadow">
+
+    <!-- Controls -->
+    <div class="row g-3 align-items-center mb-2">
+      <!-- Slider 1 -->
+      <div class="col-12 col-md-4">
+        <label class="form-label fw-semibold mb-1">
+          Rate:
+          <span id="rateValueDR" class="fw-normal">10000</span>
+        </label>
+        <input
+          type="range"
+          class="form-range"
+          id="rateDR"
+          min="1000"
+          max="30000"
+          step="1000"
+          value="10000"
+        />
+      </div>
+
+      <!-- Slider 2 -->
+      <div class="col-12 col-md-4">
+        <label class="form-label fw-semibold mb-1">
+          Coefficient:
+          <span id="coefficientValue" class="fw-normal">15000</span>
+        </label>
+        <input
+          type="range"
+          class="form-range"
+          id="coefficient"
+          min="1000"
+          max="40000"
+          step="1000"
+          value="15000"
+        />
+      </div>
+
+      <!-- Reset Button -->
+      <div class="col-12 col-md-4 d-flex align-items-stretch mt-2 mt-md-0">
+        <button
+          type="button"
+          id="resetButtonDimRets"
+          class="btn  bg-green rounded-pill shadow-sm font-weight-bold w-100"
+        >
+          Reset Sliders
+        </button>
+      </div>
+    </div>
+    
+  <hr>
+
+    <!-- Charts -->
+    <div class="row">
+      <div class="col-12 col-md-6 mb-4 mb-md-0">
+        <canvas id="diminishingChart" height="250"></canvas>
+      </div>
+      <div class="col-12 col-md-6">
+        <canvas id="mediaContributionChart" height="250"></canvas>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+
+
+<script>
+  function initDimRetsWidget() {
+    const mediaSpend = [0, 2_500, 0, 0, 20_500, 0, 0, 5_300, 0, 12_300, 0, 0, 15_100, 0];
+    const baseValue = 10000;
+    const mediaSpendRange = Array.from({ length: 30 }, (_, i) => i * 1000);
+
+    let rate = 10000;
+    let coefficient = 15000;
+
+    function diminishingReturns(media, rate) {
+      return media.map(value => 1 - Math.exp(-value / rate));
+    }
+
+    function calcContribution(media, rate, coeff) {
+      return diminishingReturns(media, rate).map(val => val * coeff);
+    }
+
+    function calcSales(media, rate, coeff) {
+      return calcContribution(media, rate, coeff).map(val => baseValue + val);
+    }
+
+    // Initial calculations
+    let contributions = calcContribution(mediaSpend, rate, coefficient);
+    let contributionsRange = calcContribution(mediaSpendRange, rate, coefficient);
+
+    let sales = calcSales(mediaSpend, 10000, 15000); // initial
+    let pointsData = mediaSpend.map((x, i) => ({ x, y: sales[i] - baseValue }));
+
+
+    // Chart 1: Weekly stacked bar chart
+    const ctx1 = document.getElementById('diminishingChart').getContext('2d');
+    const chart1 = new Chart(ctx1, {
+      type: 'bar',
+      data: {
+        labels: mediaSpend.map((_, i) => `Week ${i + 1}`),
+        datasets: [
+          {
+            label: 'Base',
+            data: Array(mediaSpend.length).fill(baseValue),
+            backgroundColor: 'rgba(255, 159, 64, 0.5)',
+            stack: 'Stack 0'
+          },
+          {
+            label: 'Media Contribution',
+            data: contributions,
+            backgroundColor: 'rgba(75, 192, 192, 0.5)',
+            stack: 'Stack 0'
+          },
+          {
+            label: 'Sales',
+            data: sales,
+            type: 'line',
+            borderColor: 'rgba(54, 162, 235, 1)',
+            borderWidth: 2,
+            pointBackgroundColor: 'rgba(54, 162, 235, 1)',
+            fill: false
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        scales: {
+          x: { stacked: true, grid: { display: false } },
+          y: {
+            stacked: true,
+            min: 0,
+            max: 30000,
+            title: { display: true, text: 'Sales' },
+            grid: { display: false }
+          }
+        }
+      }
+    });
+
+    // Chart 2: Curve + points
+    const ctx2 = document.getElementById('mediaContributionChart').getContext('2d');
+    const chart2 = new Chart(ctx2, {
+      type: 'line',
+      data: {
+        labels: mediaSpendRange,
+        datasets: [
+          {
+            label: 'Diminishing Returns Curve',
+            data: contributionsRange,
+            borderColor: 'rgba(75, 192, 192, 1)',
+            borderWidth: 2,
+            fill: false,
+            tension: 0.3
+          },
+          {
+            label: 'Observed Points',
+            data: pointsData,
+            type: 'scatter',
+            pointRadius: 5,
+            backgroundColor: 'rgba(255, 99, 132, 1)'
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        scales: {
+          x: {
+            type: 'linear',
+            min: Math.min(...mediaSpend),
+            max: Math.max(...mediaSpend) + 2000,
+            title: { display: true, text: 'Media Spend' },
+            grid: { display: false }
+          },
+          y: {
+            min: 0,
+            max: Math.max(...sales.map(s => s - baseValue)) + 1000,
+            title: { display: true, text: 'Media Contribution' },
+            grid: { display: false }
+          }
+        }
+      }
+    });
+
+    // Update charts on slider input
+function updateCharts() {
+  rate = parseFloat(document.getElementById('rateDR').value);
+  coefficient = parseFloat(document.getElementById('coefficient').value);
+
+  document.getElementById('rateValueDR').textContent = rate;
+  document.getElementById('coefficientValue').textContent = coefficient;
+
+  contributions = calcContribution(mediaSpend, rate, coefficient);
+  contributionsRange = calcContribution(mediaSpendRange, rate, coefficient);
+
+  chart1.data.datasets[1].data = contributions;               // update bar
+  chart2.data.datasets[0].data = contributionsRange;          // update line only
+
+  chart1.update();
+  chart2.update();
+}
+
+    function resetSliders() {
+      document.getElementById('rateDR').value = 10000;
+      document.getElementById('coefficient').value = 15000;
+      document.getElementById('rateValueDR').textContent = 10000;
+      document.getElementById('coefficientValue').textContent = 15000;
+      updateCharts();
+    }
+
+    // Event listeners
+    document.getElementById('rateDR').addEventListener('input', updateCharts);
+    document.getElementById('coefficient').addEventListener('input', updateCharts);
+    document.getElementById('resetButtonDimRets').addEventListener('click', resetSliders);
+  }
+
+  requestAnimationFrame(initDimRetsWidget);
+</script>

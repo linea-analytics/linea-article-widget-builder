@@ -1,0 +1,3 @@
+# Linea Article Widget Builder
+
+This repo contains an example of a widget `/example/dimrets-widget.html` which is an interactive chart embedded into the `/example/article.html` page. The `/example/blog-single.js` script is called by the `/example/article.html` page to embed widgets. The entire `example/` folder should serve as a guide to generate new widgets to embed into other articles, with the only output needed being the `widget.html` file.

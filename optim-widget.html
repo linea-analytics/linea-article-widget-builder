@@ -1,0 +1,375 @@
+<style>
+  #optim-widget-root .optim-btn {
+    border: 2px solid #15803d;
+    color: #15803d;
+    background: transparent;
+    transition: background 0.2s, color 0.2s;
+    font-weight: 600;
+    font-size: 0.9rem;
+    min-width: 90px;
+  }
+  #optim-widget-root .optim-btn.active-btn {
+    background: #15803d;
+    color: #fff;
+  }
+  #optim-widget-root .optim-btn:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(21,128,61,0.25);
+  }
+  #optim-widget-root #optim-grid th.channel-header {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    background: #f8fafc;
+    font-weight: 600;
+    font-size: 0.72rem;
+    padding: 5px 8px;
+    border-right: 2px solid #dee2e6;
+    border-bottom: 1px solid #dee2e6;
+    white-space: nowrap;
+    min-width: 105px;
+  }
+  #optim-widget-root #optim-grid thead th.week-header {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: #f8fafc;
+    font-weight: 500;
+    font-size: 0.62rem;
+    padding: 4px 2px;
+    border-bottom: 2px solid #dee2e6;
+    text-align: center;
+    min-width: 42px;
+    color: #4b5563;
+  }
+  #optim-widget-root #optim-grid thead th.week-header.quarter-start {
+    border-left: 2px solid #dee2e6;
+  }
+  #optim-widget-root #optim-grid td.data-cell {
+    font-size: 0.62rem;
+    text-align: center;
+    padding: 3px 2px;
+    border: 1px solid rgba(0,0,0,0.04);
+    min-width: 42px;
+    transition: background 0.3s, color 0.3s;
+    cursor: default;
+  }
+  #optim-widget-root #optim-grid td.data-cell.quarter-start {
+    border-left: 2px solid rgba(0,0,0,0.12);
+  }
+  #optim-widget-root #optim-grid tbody tr td.channel-header {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: #f8fafc;
+    font-weight: 600;
+    font-size: 0.72rem;
+    padding: 5px 8px;
+    border-right: 2px solid #dee2e6;
+    white-space: nowrap;
+  }
+  #optim-widget-root .kpi-box {
+    border-radius: 8px;
+    padding: 10px 6px;
+    background: #f8fafc;
+    border: 1px solid #e5e7eb;
+  }
+  #optim-widget-root .kpi-value {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #15803d;
+  }
+  #optim-widget-root .kpi-label {
+    font-size: 0.7rem;
+    color: #6b7280;
+    margin-top: 2px;
+  }
+</style>
+
+<div id="optim-widget-root" class="py-4">
+  <h4 class="text-center mb-1">Media Budget Optimisation Plan</h4>
+  <p class="text-center text-muted small mb-3">Select an objective to see the recommended weekly spend allocation across channels</p>
+
+  <div class="card p-3 p-md-4 shadow">
+
+    <!-- Objective Selector -->
+    <div class="d-flex justify-content-center gap-2 mb-3" style="gap: 10px !important;">
+      <button class="btn optim-btn active-btn rounded-pill px-4" data-obj="budget">Budget</button>
+      <button class="btn optim-btn rounded-pill px-4" data-obj="hybrid">Hybrid</button>
+      <button class="btn optim-btn rounded-pill px-4" data-obj="uplift">Uplift</button>
+    </div>
+
+    <!-- Description -->
+    <p class="text-center small mb-3" id="optim-desc" style="color:#374151; min-height: 2.5em;"></p>
+
+    <!-- KPIs -->
+    <div class="row g-2 mb-3 text-center">
+      <div class="col-4">
+        <div class="kpi-box">
+          <div class="kpi-value" id="kpi-annual">—</div>
+          <div class="kpi-label">Annual Spend</div>
+        </div>
+      </div>
+      <div class="col-4">
+        <div class="kpi-box">
+          <div class="kpi-value" id="kpi-weekly">—</div>
+          <div class="kpi-label">Avg Weekly Spend</div>
+        </div>
+      </div>
+      <div class="col-4">
+        <div class="kpi-box">
+          <div class="kpi-value" id="kpi-peak">—</div>
+          <div class="kpi-label">Peak Week Spend</div>
+        </div>
+      </div>
+    </div>
+
+    <hr class="my-2">
+
+    <!-- Heatmap Grid -->
+    <div style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
+      <table id="optim-grid" style="border-collapse: collapse; font-size: 0.62rem; white-space: nowrap; width: 100%;">
+      </table>
+    </div>
+
+    <!-- Legend -->
+    <div class="d-flex align-items-center justify-content-between mt-3 flex-wrap" style="gap: 8px;">
+      <span style="font-size: 0.72rem; color: #6b7280;">Values in £k &nbsp;|&nbsp; Colour intensity is relative within each channel row</span>
+      <div class="d-flex align-items-center" style="gap: 6px;">
+        <span style="font-size: 0.72rem; color: #6b7280;">Low</span>
+        <div style="width: 90px; height: 10px; background: linear-gradient(to right, #dcfce7, #15803d); border-radius: 4px;"></div>
+        <span style="font-size: 0.72rem; color: #6b7280;">High</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+
+<script>
+function initOptimWidget() {
+
+  // ── Seasonality index, weeks 1–52 ──────────────────────────────────────────
+  // Reflects a typical UK consumer brand with Easter, Summer and Christmas peaks
+  const seasonality = [
+    0.55, 0.55, 0.58, 0.60,        // W1–W4   Jan  (quiet)
+    0.62, 0.65, 0.68, 0.70,        // W5–W8   Feb
+    0.72, 0.75, 0.78, 0.80, 0.82,  // W9–W13  Mar
+    0.95, 1.00, 0.98, 0.88,        // W14–W17 Apr  (Easter)
+    0.82, 0.82, 0.80, 0.78,        // W18–W21 May
+    0.80, 0.82, 0.85, 0.87, 0.88,  // W22–W26 Jun
+    0.90, 0.92, 0.95, 0.93,        // W27–W30 Jul  (Summer)
+    0.92, 0.90, 0.88, 0.87, 0.85,  // W31–W35 Aug
+    0.85, 0.86, 0.88, 0.90,        // W36–W39 Sep
+    0.92, 0.95, 0.97, 1.00,        // W40–W43 Oct
+    1.10, 1.20, 1.30, 1.35,        // W44–W47 Nov  (Black Friday)
+    1.42, 1.48, 1.50, 1.45, 1.30   // W48–W52 Dec  (Christmas)
+  ];
+
+  // TV is pulsed: 1 = active, 0 = dark (off air)
+  const tvPulse = [
+    0, 0, 0, 0,          // Jan  – off
+    0, 0, 0, 0,          // Feb  – off
+    0, 0, 0, 0, 0,       // Mar  – off
+    1, 1, 1, 0.6,        // Apr  – Easter burst
+    0, 0, 0, 0,          // May  – off
+    0.5, 0.5, 0.7, 0.7, 0.7,  // Jun  – summer build
+    1, 1, 1, 1,          // Jul  – summer peak
+    1, 0.8, 0.5, 0, 0,   // Aug  – summer fade
+    0, 0, 0, 0,          // Sep  – off
+    1, 1, 1, 1,          // Oct  – autumn burst
+    1, 1, 1, 1,          // Nov  – Black Friday
+    1, 1, 1, 1, 0.6      // Dec  – Christmas
+  ];
+
+  // OOH is booked in longer sustained periods
+  const oohPulse = [
+    0, 0, 0, 0,              // Jan  – off
+    0.4, 0.4, 0.5, 0.5,     // Feb  – light
+    0.5, 0.6, 0.7, 0.8, 0.8, // Mar  – building
+    1, 1, 1, 0.8,            // Apr  – Easter
+    0.7, 0.7, 0.6, 0.5,     // May  – fading
+    0.8, 0.9, 1, 1, 1,      // Jun  – summer
+    1, 1, 1, 1,              // Jul  – summer peak
+    0.8, 0.7, 0.6, 0.5, 0.4, // Aug  – fading
+    0.4, 0.5, 0.6, 0.7,     // Sep  – rebuilding
+    0.8, 0.9, 1, 1,          // Oct
+    1, 1, 1, 1,              // Nov  – peak
+    1, 1, 1, 0.8, 0.5        // Dec  – Christmas
+  ];
+
+  // ── Objectives ─────────────────────────────────────────────────────────────
+  // base = weekly spend (£k) at seasonality = 1 and pulse = 1
+  // min  = floor spend (£k) when channel is always-on
+  const OBJECTIVES = {
+    budget: {
+      label: 'Budget',
+      desc: 'Maximises return on investment within a tight budget. Spend is concentrated in high-efficiency digital channels, with TV used only at seasonal peaks.',
+      tv:      { base: 95,  pulse: tvPulse,  min: 0  },
+      social:  { base: 42,  pulse: null,      min: 22 },
+      display: { base: 24,  pulse: null,      min: 14 },
+      ooh:     { base: 30,  pulse: oohPulse,  min: 0  },
+      search:  { base: 38,  pulse: null,      min: 24 },
+    },
+    hybrid: {
+      label: 'Hybrid',
+      desc: 'Balances brand-building with performance. Pulsed TV drives awareness while always-on digital channels sustain demand throughout the year.',
+      tv:      { base: 185, pulse: tvPulse,  min: 0  },
+      social:  { base: 62,  pulse: null,      min: 38 },
+      display: { base: 40,  pulse: null,      min: 24 },
+      ooh:     { base: 52,  pulse: oohPulse,  min: 10 },
+      search:  { base: 65,  pulse: null,      min: 44 },
+    },
+    uplift: {
+      label: 'Uplift',
+      desc: 'Maximises absolute revenue by pushing all channels towards saturation. Heavy TV investment in peak periods, with digital channels running at full capacity year-round.',
+      tv:      { base: 340, pulse: tvPulse,  min: 0  },
+      social:  { base: 100, pulse: null,      min: 65 },
+      display: { base: 80,  pulse: null,      min: 52 },
+      ooh:     { base: 90,  pulse: oohPulse,  min: 28 },
+      search:  { base: 100, pulse: null,      min: 68 },
+    }
+  };
+
+  const CHANNELS = [
+    { key: 'tv',      label: 'TV' },
+    { key: 'social',  label: 'Social' },
+    { key: 'display', label: 'Display Video' },
+    { key: 'ooh',     label: 'OOH' },
+    { key: 'search',  label: 'Paid Search' },
+  ];
+
+  // Deterministic micro-variation so adjacent weeks aren't identical
+  function variation(channelIdx, weekIdx) {
+    return 1 + Math.sin(channelIdx * 2.71 + weekIdx * 1.37) * 0.06;
+  }
+
+  function generateData(objective) {
+    const cfg = OBJECTIVES[objective];
+    return CHANNELS.map((ch, ci) => {
+      const c = cfg[ch.key];
+      return Array.from({ length: 52 }, (_, wi) => {
+        const s = seasonality[wi];
+        const p = c.pulse ? c.pulse[wi] : 1;
+        if (c.pulse && p === 0) return 0;
+        const raw = c.base * s * p * variation(ci, wi);
+        const rounded = Math.max(c.min, Math.round(raw / 5) * 5);
+        return rounded; // £k
+      });
+    });
+  }
+
+  // ── Colour helpers ──────────────────────────────────────────────────────────
+  // Per-row normalization: each channel gets its own scale
+  function cellColor(value, rowMax) {
+    if (value === 0 || rowMax === 0) {
+      return { bg: '#f3f4f6', text: '#9ca3af' };
+    }
+    const t = value / rowMax; // 0–1
+    // Interpolate: #dcfce7 (light green) → #15803d (dark green)
+    const r = Math.round(220 + (21 - 220) * t);
+    const g = Math.round(252 + (128 - 252) * t);
+    const b = Math.round(231 + (61  - 231) * t);
+    const textLight = t > 0.55;
+    return {
+      bg:   `rgb(${r},${g},${b})`,
+      text: textLight ? '#fff' : '#1f2937'
+    };
+  }
+
+  function formatK(v) {
+    if (v === 0) return '—';
+    return v >= 1000 ? `${(v / 1000).toFixed(1)}M` : `${v}k`;
+  }
+
+  function formatMoney(v) {
+    // v is in £k
+    if (v >= 1000) return `£${(v / 1000).toFixed(1)}M`;
+    return `£${v}k`;
+  }
+
+  // ── KPI update ──────────────────────────────────────────────────────────────
+  function updateKPIs(data) {
+    // Sum all channels per week
+    const weekTotals = Array.from({ length: 52 }, (_, wi) =>
+      data.reduce((sum, row) => sum + row[wi], 0)
+    );
+    const annual = weekTotals.reduce((a, b) => a + b, 0);
+    const avgWeekly = Math.round(annual / 52 / 5) * 5;
+    const peak = Math.max(...weekTotals);
+
+    document.getElementById('kpi-annual').textContent  = formatMoney(annual);
+    document.getElementById('kpi-weekly').textContent  = formatMoney(avgWeekly);
+    document.getElementById('kpi-peak').textContent    = formatMoney(peak);
+  }
+
+  // ── Grid render ─────────────────────────────────────────────────────────────
+  // Quarter starts (0-indexed): W1=0, W14=13, W27=26, W40=39
+  const quarterStarts = new Set([0, 13, 26, 39]);
+  const quarterLabels  = { 0: 'Q1', 13: 'Q2', 26: 'Q3', 39: 'Q4' };
+
+  function renderGrid(objective) {
+    const data = generateData(objective);
+    const table = document.getElementById('optim-grid');
+
+    // ── THEAD ──
+    let thead = '<thead><tr>';
+    thead += `<th class="channel-header week-header">Channel</th>`;
+    for (let w = 0; w < 52; w++) {
+      const qClass = quarterStarts.has(w) ? ' quarter-start' : '';
+      const label  = quarterStarts.has(w) ? `${quarterLabels[w]}<br>W${w+1}` : `W${w+1}`;
+      thead += `<th class="week-header${qClass}" title="Week ${w+1}">${label}</th>`;
+    }
+    thead += '</tr></thead>';
+
+    // ── TBODY ──
+    let tbody = '<tbody>';
+    data.forEach((row, ci) => {
+      const rowMax = Math.max(...row);
+      tbody += '<tr>';
+      tbody += `<td class="channel-header">${CHANNELS[ci].label}</td>`;
+      row.forEach((val, wi) => {
+        const { bg, text } = cellColor(val, rowMax);
+        const qClass = quarterStarts.has(wi) ? ' quarter-start' : '';
+        const display = val === 0 ? '—' : `${val}`;
+        const tooltip = `${CHANNELS[ci].label} – Week ${wi+1}: ${val === 0 ? 'No spend' : '£' + val + 'k'}`;
+        tbody += `<td class="data-cell${qClass}" style="background:${bg};color:${text};" title="${tooltip}">${display}</td>`;
+      });
+      tbody += '</tr>';
+    });
+    tbody += '</tbody>';
+
+    table.innerHTML = thead + tbody;
+
+    updateKPIs(data);
+  }
+
+  // ── Description update ──────────────────────────────────────────────────────
+  function updateDesc(objective) {
+    document.getElementById('optim-desc').textContent = OBJECTIVES[objective].desc;
+  }
+
+  // ── Button wiring ───────────────────────────────────────────────────────────
+  let currentObj = 'budget';
+
+  document.querySelectorAll('#optim-widget-root .optim-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const obj = btn.dataset.obj;
+      if (obj === currentObj) return;
+      currentObj = obj;
+
+      document.querySelectorAll('#optim-widget-root .optim-btn').forEach(b => b.classList.remove('active-btn'));
+      btn.classList.add('active-btn');
+
+      updateDesc(obj);
+      renderGrid(obj);
+    });
+  });
+
+  // ── Initial render ──────────────────────────────────────────────────────────
+  updateDesc('budget');
+  renderGrid('budget');
+}
+
+requestAnimationFrame(initOptimWidget);
+</script>
